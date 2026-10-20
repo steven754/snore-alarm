@@ -1,0 +1,25 @@
+name: snore_alarm
+description: 打鼾检测唤醒 - 用麦克风实时检测持续打鼾，播放声音/震动提醒翻身
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # 实时麦克风 PCM 流采集
+  record: ^5.1.2
+  # 麦克风/通知权限申请
+  permission_handler: ^11.3.1
+  # 震动（iOS 单次震，Android 可持续震）
+  vibration: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
