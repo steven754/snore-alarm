@@ -39,6 +39,14 @@ jobs:
       - name: Run unit tests
         run: flutter test
 
+      # 显式跑一次 pod install：后续要检查 Pods 工程里的权限宏注入结果，
+      # 而 ios/Pods/ 是 .gitignore 排除的，checkout 之后并不存在。
+      - name: CocoaPods install
+        run: |
+          cd ios
+          pod install
+          cd ..
+
       # permission_handler 的 PERMISSION_MICROPHONE 宏必须真的进到 Pods target 上。
       # 不带它，iOS 上 Permission.microphone.request() 会直接返回 denied 且不弹系统
       # 授权框，App 永远录不到音。检查 Pods 工程里的实际注入结果。
@@ -47,6 +55,7 @@ jobs:
           set -e
           if grep -q "PERMISSION_MICROPHONE=1" ios/Pods/Pods.xcodeproj/project.pbxproj; then
             echo "  ✓ Pods target 已注入 PERMISSION_MICROPHONE=1"
+            grep -c "PERMISSION_MICROPHONE=1" ios/Pods/Pods.xcodeproj/project.pbxproj
           else
             echo "::error::Pods target 缺少 PERMISSION_MICROPHONE=1，麦克风授权会失效"
             exit 1
