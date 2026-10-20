@@ -23,3 +23,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  config:
+    # 关闭 Swift Package Manager：permission_handler 的 PERMISSION_MICROPHONE 宏
+    # 依赖 CocoaPods 的 post_install 注入，SPM 路径拿不到该宏，
+    # 结果是 iOS 上不会弹麦克风授权框，App 录不到音。
+    enable-swift-package-manager: false

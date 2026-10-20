@@ -27,8 +27,11 @@ class SnoreConfig {
   double lowBandRatio = 0.55;
 
   /// 谐波能量占比阈值（0~1），衡量「周期性」。可在运行时调节。
-  /// 值越高越严格（要求谐波结构越清晰）。建议 0.4~0.6。
-  double harmonicRatio = 0.5;
+  ///
+  /// 取值 0.35：理想合成鼾声实测 0.43~0.61，白噪声仅 0.04、纯正弦 0.00，
+  /// 0.35 能在两者之间留出足够余量；再高则真实鼾声（谐波结构弱于合成信号）
+  /// 容易漏检。宁可漏一次也别整夜不响 —— 用「连续时长 + 冷却」兜底。
+  double harmonicRatio = 0.35;
 
   /// 相对噪声底的最小信噪比（dB）。越低越灵敏（越容易触发）。
   double minSnrDb = 9.0;
@@ -186,6 +189,11 @@ class SnoreDetector {
   ///
   /// 对「谐波结构清晰」的周期信号（如鼾声），能量集中在各谐波峰上，比值接近 1；
   /// 对宽带噪声，谐波峰不突出，比值偏低。纯正弦（无谐波）比值趋于 0。
+  ///
+  /// 注意：分子必须取谐波峰中心 ±1 bin 的能量和，不能只取中心 bin。
+  /// 汉宁窗下正弦能量会外泄到相邻 bin（能量比约 1 : 0.25 : 0.06），
+  /// 只取中心 bin 时，理想谐波信号的比值也只到 0.37~0.47，
+  /// 永远够不到 0.5 的阈值 —— 结果就是「完美鼾声也不触发」。
   double _harmonicRatio(List<double> mag, int f0Bin, int maxBin) {
     if (f0Bin < 2) return 0.0;
     double harmonic = 0.0;
@@ -194,11 +202,9 @@ class SnoreDetector {
       final center = f0Bin * h;
       if (center - 1 > maxBin) break;
       lastCenter = center + 1;
-      double peak = 0.0;
       for (int k = center - 1; k <= center + 1 && k < mag.length; k++) {
-        if (mag[k] > peak) peak = mag[k];
+        harmonic += mag[k] * mag[k];
       }
-      harmonic += peak * peak;
     }
     // 分母：基频之后到末次谐波之间的连续频段能量（不含基频本身）。
     double denom = 0.0;

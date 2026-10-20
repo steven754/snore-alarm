@@ -3,6 +3,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'alarm_service.dart';
 import 'audio_service.dart';
+import 'snore_detector.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -236,6 +237,26 @@ class _HomePageState extends State<HomePage> {
               divisions: 8,
               display: '${cfg.durationSeconds.toStringAsFixed(1)} 秒',
               onChanged: (v) => setState(() => cfg.durationSeconds = v),
+            ),
+            _slider(
+              label: '低频能量占比阈值',
+              hint: '鼾声能量集中在 100–400 Hz 的程度，要求越高越严格',
+              value: cfg.lowBandRatio,
+              min: 0.3,
+              max: 0.9,
+              divisions: 12,
+              display: '${(cfg.lowBandRatio * 100).toStringAsFixed(0)}%',
+              onChanged: (v) => setState(() => cfg.lowBandRatio = v),
+            ),
+            _slider(
+              label: '谐波占比阈值',
+              hint: '鼾声的周期性（谐波结构清晰度），环境吵时可适当调高',
+              value: cfg.harmonicRatio,
+              min: 0.1,
+              max: 0.8,
+              divisions: 14,
+              display: '${(cfg.harmonicRatio * 100).toStringAsFixed(0)}%',
+              onChanged: (v) => setState(() => cfg.harmonicRatio = v),
             ),
           ],
         ),
