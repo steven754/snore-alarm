@@ -517,6 +517,7 @@
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Profile;
+				CODE_SIGN_STYLE = Automatic;
 		};
 		331C8088294A63A400263BE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -702,6 +703,7 @@
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
+				CODE_SIGN_STYLE = Automatic;
 		};
 		97C147071CF9000F007C117D /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -723,6 +725,7 @@
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
+				CODE_SIGN_STYLE = Automatic;
 		};
 /* End XCBuildConfiguration section */
 

@@ -39,26 +39,32 @@ jobs:
       - name: Run unit tests
         run: flutter test
 
-      # Flutter 3.47 的 `flutter build ios --no-codesign` 仍会校验工程里是否配置了
+      # permission_handler 的 PERMISSION_MICROPHONE 宏必须真的进到 Pods target 上。
+      # 不带它，iOS 上 Permission.microphone.request() 会直接返回 denied 且不弹系统
+      # 授权框，App 永远录不到音。检查 Pods 工程里的实际注入结果。
+      - name: Verify permission macro reached Pods
+        run: |
+          set -e
+          if grep -q "PERMISSION_MICROPHONE=1" ios/Pods/Pods.xcodeproj/project.pbxproj; then
+            echo "  ✓ Pods target 已注入 PERMISSION_MICROPHONE=1"
+          else
+            echo "::error::Pods target 缺少 PERMISSION_MICROPHONE=1，麦克风授权会失效"
+            exit 1
+          fi
+
+      # Flutter 3.47 的 `flutter build ios --no-codesign` 仍会校验工程是否配置了
       # DEVELOPMENT_TEAM / PROVISIONING_PROFILE（flutter_tools mac.dart::_missingDevelopmentTeam），
-      # 本工程没有签名团队就会报 "requires a selected Development Team" 而失败。
-      # 注入一个占位团队绕过该校验；真正的签名已被 CODE_SIGNING_ALLOWED=NO 关闭，
-      # 占位值不会被使用。此修改只在 CI 工作区内生效，不入库。
+      # 本工程没有签名团队就报 "requires a selected Development Team" 而失败。
+      # Runner target 的 base config 是 Flutter/Release.xcconfig，把占位团队写进去
+      # 即可被 `xcodebuild -showBuildSettings` 读到、通过该校验。
+      # 真正的签名已被 CODE_SIGNING_ALLOWED=NO 关闭，占位值不会被使用；此修改只在 CI 生效。
       - name: Inject placeholder DEVELOPMENT_TEAM
         run: |
-          python3 - <<'PY'
-          import pathlib
-          p = pathlib.Path('ios/Runner.xcodeproj/project.pbxproj')
-          s = p.read_text(encoding='utf-8')
-          if 'DEVELOPMENT_TEAM' not in s:
-              s = s.replace(
-                  'CODE_SIGN_STYLE = Automatic;',
-                  'CODE_SIGN_STYLE = Automatic;\n\t\t\t\tDEVELOPMENT_TEAM = ABCDE12345;')
-              p.write_text(s, encoding='utf-8')
-              print('  已注入占位 DEVELOPMENT_TEAM = ABCDE12345')
-          else:
-              print('  DEVELOPMENT_TEAM 已存在，跳过')
-          PY
+          for f in ios/Flutter/Debug.xcconfig ios/Flutter/Release.xcconfig; do
+            grep -q '^DEVELOPMENT_TEAM' "$f" || echo "DEVELOPMENT_TEAM = ABCDE12345;" >> "$f"
+          done
+          echo "--- Release.xcconfig ---"
+          cat ios/Flutter/Release.xcconfig
 
       - name: Build iOS release (unsigned)
         # 即使 flutter build 因后置校验返回非零，Xcode 编译本身可能已成功，
@@ -68,13 +74,15 @@ jobs:
       - name: Verify app bundle
         run: |
           set -e
-          APP=build/ios/iphoneos/Runner.app
-          if [ ! -d "$APP" ]; then
-            echo "::error::未产出 $APP，构建失败"
-            ls -la build/ios 2>/dev/null || true
+          # Flutter 3.47 的产物目录是 build/ios/Release-iphoneos/，旧版是 build/ios/iphoneos/
+          APP=$(find build/ios -maxdepth 2 -name 'Runner.app' -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::未找到 Runner.app，构建失败"
+            find build/ios -maxdepth 2 -type d | head -30
             exit 1
           fi
-          echo "  ✓ $APP 已生成"
+          echo "APP_PATH=$APP" >> "$GITHUB_ENV"
+          echo "  ✓ 产物: $APP"
           echo "--- 二进制架构 ---"
           file "$APP/Runner"
           echo "--- 权限配置 ---"
@@ -82,24 +90,32 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$APP/Info.plist"
-          echo "--- 插件是否链接进二进制 ---"
-          nm -gU "$APP/Runner" 2>/dev/null | grep -c -i "record\|permission" || true
+          echo "--- 权限宏是否真进了二进制 ---"
+          # AudioVideoPermissionStrategy 这个类只在 PERMISSION_MICROPHONE/CAMERA 开启时才编译，
+          # 二进制里能查到它就说明宏生效了（否则 iOS 不会弹麦克风授权框）
+          if nm -gU "$APP/Runner" 2>/dev/null | grep -q "AudioVideoPermissionStrategy"; then
+            echo "  ✓ 宏生效：AudioVideoPermissionStrategy 已在二进制中"
+          else
+            echo "::error::二进制里没有 AudioVideoPermissionStrategy，麦克风权限宏未生效"
+            exit 1
+          fi
 
       - name: Package unsigned IPA
         run: |
           set -e
-          cd build/ios/iphoneos
+          cd "$(dirname "$APP_PATH")"
           rm -rf Payload
           mkdir -p Payload
           cp -R Runner.app Payload/Runner.app
           zip -qry snore-alarm-unsigned.ipa Payload
           ls -lh snore-alarm-unsigned.ipa
-          unzip -l snore-alarm-unsigned.ipa | head -8
+          unzip -l snore-alarm-unsigned.ipa | head -6
+          unzip -l snore-alarm-unsigned.ipa | tail -4
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: snore-alarm-ipa
-          path: build/ios/iphoneos/snore-alarm-unsigned.ipa
+          path: "**/snore-alarm-unsigned.ipa"
           if-no-files-found: error
           retention-days: 30
