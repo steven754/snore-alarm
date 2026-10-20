@@ -187,6 +187,7 @@ class _HomePageState extends State<HomePage> {
                 _metric('信噪比 SNR', '${(frame?.snrDb ?? 0).toStringAsFixed(1)} dB'),
                 _metric('低频占比', '${((frame?.lowRatio ?? 0) * 100).toStringAsFixed(0)}%'),
                 _metric('谐波占比', '${((frame?.harmonicRatio ?? 0) * 100).toStringAsFixed(0)}%'),
+                _buildCriteria(frame),
               ],
             ),
           ),
@@ -204,6 +205,72 @@ class _HomePageState extends State<HomePage> {
           Text(label, style: const TextStyle(color: Colors.grey)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
+      ),
+    );
+  }
+
+  /// 三项判定的实时状态。
+  ///
+  /// 单独显示是为了回答「为什么没触发」——只看到"没响"是无从下手，
+  /// 看到哪一项是 ✗ 就知道该调哪个滑块，不用盲试。
+  Widget _buildCriteria(FrameResult? frame) {
+    if (frame == null) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 10),
+        child: Text(
+          '开始监听后这里会实时显示三项判定状态',
+          style: TextStyle(color: Colors.grey, fontSize: 11),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _criterionChip('信噪比', frame.snrOk),
+              const SizedBox(width: 6),
+              _criterionChip('低频', frame.lowOk),
+              const SizedBox(width: 6),
+              _criterionChip('谐波', frame.harmonicOk),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '三项同时为 ✓ 才会触发提醒；哪项是 ✗ 就调对应的阈值',
+            style: TextStyle(color: Colors.grey, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _criterionChip(String label, bool ok) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        decoration: BoxDecoration(
+          color: ok
+              ? Colors.greenAccent.withValues(alpha: 0.15)
+              : Colors.redAccent.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: ok
+                ? Colors.greenAccent.withValues(alpha: 0.5)
+                : Colors.redAccent.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Text(
+          '${ok ? '✓' : '✗'} $label',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: ok ? Colors.greenAccent : Colors.redAccent,
+          ),
+        ),
       ),
     );
   }

@@ -52,6 +52,14 @@ class FrameResult {
   final double lowRatio;
   final double harmonicRatio;
 
+  /// 三项判定的逐项结果。
+  ///
+  /// 单独暴露出来是为了让 UI 能实时显示「当前卡在哪一项」——
+  /// 否则用户只看到"没触发"，不知道该调哪个阈值，只能盲试。
+  final bool snrOk; // 信噪比是否达标
+  final bool lowOk; // 低频能量占比是否达标
+  final bool harmonicOk; // 谐波清晰度是否达标
+
   const FrameResult({
     required this.isSnore,
     required this.alertTriggered,
@@ -59,6 +67,9 @@ class FrameResult {
     required this.snrDb,
     required this.lowRatio,
     required this.harmonicRatio,
+    this.snrOk = false,
+    this.lowOk = false,
+    this.harmonicOk = false,
   });
 }
 
@@ -129,10 +140,11 @@ class SnoreDetector {
     final f0Bin = _argMax(mag, f0BinLo, f0BinHi);
     final harmonicRatio = _harmonicRatio(mag, f0Bin, maxBin);
 
-    // 6. 单帧判定。
-    final isSnore = snrDb >= config.minSnrDb &&
-        lowRatio >= config.lowBandRatio &&
-        harmonicRatio >= config.harmonicRatio;
+    // 6. 单帧判定（三项分别记录，便于 UI 显示卡在哪一项）。
+    final snrOk = snrDb >= config.minSnrDb;
+    final lowOk = lowRatio >= config.lowBandRatio;
+    final harmonicOk = harmonicRatio >= config.harmonicRatio;
+    final isSnore = snrOk && lowOk && harmonicOk;
 
     if (isSnore) {
       _consecutiveHits++;
@@ -160,6 +172,9 @@ class SnoreDetector {
       snrDb: snrDb,
       lowRatio: lowRatio,
       harmonicRatio: harmonicRatio,
+      snrOk: snrOk,
+      lowOk: lowOk,
+      harmonicOk: harmonicOk,
     );
   }
 
